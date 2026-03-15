@@ -388,3 +388,13 @@ https://fluxer.dev:48763/login
 | **Port 48763 not reachable** | Check your firewall rules: `sudo ufw allow 48763/tcp` |
 | **`devenv shell` hangs or fails** | Try `devenv shell -- --show-trace` for a detailed error trace. |
 | **`config/config.json` not found** | Make sure you completed step 5.6 — run `devenv up`, wait for compilation to finish, then press `Ctrl + C`. |
+
+---
+
+## 🎉 Success
+
+If everything was done correctly, you should see the Fluxer login screen:
+
+![Fluxer Login Screen](.github/done.png)
+
+Congratulations — enjoy the best self-hosted Discord alternative, running right on your own server!
