@@ -1,5 +1,8 @@
 # Fluxer — Installation Guide
 
+> [!CAUTION]
+> **Fluxer is under active development and not yet production-ready.** The current stack is heavy, the self-hosting experience is still being simplified, and breaking changes are expected. This guide is intended for early testing and experimentation only — **do not use this setup in production.** Once the ongoing refactor is complete, the team plans to open up contributions and provide a much smoother deployment process. Follow the [main repository](https://github.com/fluxerapp/fluxer) for updates.
+
 > Step-by-step instructions for deploying Fluxer on a fresh Linux (Ubuntu/Debian) server with HTTPS support.
 
 ---
