@@ -1,0 +1,174 @@
+sudo adduser fluxer
+sudo usermod -aG sudo fluxer
+sudo -u fluxer -i
+
+git clone https://github.com/fluxerapp/fluxer.git
+cd fluxer/
+sh <(curl -L https://nixos.org/nix/install) --daemon
+exit
+nix-env --install --attr devenv -f https://github.com/NixOS/nixpkgs/tarball/nixpkgs-unstable
+cd fluxer/
+devenv shell
+
+// получаем ошибку и вводим
+devenv shell -- --show-trace
+
+ПОЛУЧАЕМ:
+fluxer@v62309:~/fluxer$ devenv shell -- --show-trace
+✓ Configuring shell                                                                           13.6s
+  └ ✗ Evaluating shell 3817 files                                                             13.6s
+Error:   × Evaluation error: Failed to get drvPath from shell derivation: warning: ignoring the client-
+  │ specified setting 'system', because it is a restricted setting and you are not a trusted user:
+  │        … while calling the 'derivationStrict' builtin
+  │          at «nix-internal»/derivation-internal.nix:37:12:
+  │            36|
+  │            37|   strict = derivationStrict drvAttrs;
+  │              |            ^
+  │            38|
+  │
+  │
+  │        … while evaluating derivation 'devenv-shell'
+  │          whose name attribute is located at /nix/store/kkx2hzq20ggrwhy385jglnxjncg4lqck-
+  │ source/pkgs/stdenv/generic/make-derivation.nix:536:13
+  │
+  │        … while evaluating attribute 'shellHook' of derivation 'devenv-shell'
+  │          at /nix/store/kkx2hzq20ggrwhy385jglnxjncg4lqck-source/pkgs/build-support/mkshell/
+  │ default.nix:44:7:
+  │            43|
+  │            44|       shellHook = lib.concatStringsSep "\n" (
+  │              |       ^
+  │            45|         lib.catAttrs "shellHook" (lib.reverseList inputsFrom ++ [ attrs ])
+  │
+  │
+  │        … while evaluating the option `enterShell':
+  │
+  │        … while evaluating definitions from `/nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-
+  │ source/src/modules/integrations/git-hooks.nix':
+  │
+  │        (stack trace truncated; use '--show-trace' to show the full, detailed trace)
+  │
+  │
+  │        at /nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-source/src/modules/integrations/git-
+  │ hooks.nix:126:47:
+  │           125|         if [ -z "$configFile" ]; then
+  │           126|           configFile='${config.devenv.root}/${cfg.configPath}'
+  │              |                                               ^
+  │           127|         fi
+  │
+  │        error: attribute 'configPath' missing
+
+
+go to /nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-source/src/modules/integrations/git-hooks.nix
+
+sudo nano /nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-source/src/modules/integrations/git-hooks.nix
+
+
+fixing on 126 string from ``configFile='${config.devenv.root}/${cfg.configPath}'`` to ``configFile='${config.devenv.root}/${cfg.configPath or ""}'``
+
+writing:
+devenv shell
+pnpm install
+pnpm run schema:generate
+ls -la packages/config/src/MasterZodSchema.generated*
+cd ~/fluxer/fluxer_app/crates/libfluxcore
+cargo build --release --target wasm32-unknown-unknown
+
+cd ~/fluxer
+cd fluxer_app
+pnpm run generate:colors
+pnpm run generate:css-types
+
+doing:
+
+cd ~/fluxer/fluxer_app
+pnpm run i18n:extract
+pnpm run i18n:compile
+ls -la src/locales/*/messages.mjs
+
+
+cd ~/fluxer/fluxer_app
+pnpm run generate:colors
+pnpm run generate:css-types
+ls -la src/styles/generated/
+
+cd ~/fluxer/fluxer_app
+pnpm run generate:masks
+cd ~/fluxer/fluxer_app/crates/libfluxcore
+cargo build --release --target wasm32-unknown-unknown
+cd ~/fluxer/fluxer_app
+pnpm run wasm:codegen
+ls -la ~/fluxer/fluxer_app/pkgs/libfluxcore
+
+and see config/config.json and insert:
+
+  FROM:
+  "domain": {
+    "base_domain": "localhost",
+    "public_port": 48763
+  },
+  TO:
+  "domain": {
+    "base_domain": "fluxer.dev",
+    "public_port": 48763,
+    "public_scheme": "https"
+  },
+
+mkdir certs
+please create a certs/fluxer.conf with:
+``[req]                                                                                                                                                                                   
+default_bits = 4096                                                                                                                                                                     
+prompt = no                                                                                                                                                                             
+default_md = sha256                                                                                                                                                                     
+req_extensions = req_ext                                                                                                                                                                
+distinguished_name = dn                                                                                                                                                                 
+                                                                                                                                                                                        
+[dn]                                                                                                                                                                                    
+CN = fluxer.dev                                                                                                                                                                         
+                                                                                                                                                                                        
+[req_ext]                                                                                                                                                                               
+subjectAltName = @alt_names                                                                                                                                                             
+                                                                                                                                                                                        
+[alt_names]                                                                                                                                                                             
+DNS.1 = fluxer.dev                                                                                                                                                                      
+DNS.2 = localhost                                                                                                                                                                       
+IP.1 = 127.0.0.1                                                                                                                                                                        
+IP.2 = <<PLEASE REPLACE HERE YOUR PUBLIC IP BEFORE YOU SAVE THIS CONFIGURATION!!!>>``
+
+
+cd ~/fluxer/certs
+openssl req -x509 -newkey rsa:4096 -keyout fluxer.key -out fluxer.crt -days 365 -nodes -config fluxer.conf
+ls -la ~/fluxer/certs
+
+AND SEE dev/Caddyfile.dev:
+
+:48763 {
+	handle /_caddy_health {
+		respond "OK" 200
+	}
+
+REPLACE IT WITH
+
+fluxer.dev:48763 {
+	tls /home/fluxer/fluxer/certs/fluxer.crt /home/fluxer/fluxer/certs/fluxer.key
+	
+	handle /_caddy_health {
+		respond "OK" 200
+	}
+
+please run it:
+devenv up
+
+and you need pass here (ON YOUR LOCAL PC, NOT YOUR LINUX SERVER, OR FLUXER INSTANCE!!!):
+C:\Windows\System32\drivers\etc\hosts (WINDOWS)
+OR:
+/etc/hosts (LINUX)
+
+ADD:
+
+<INSERT HERE YOUR SERVER IP!>   fluxer.dev
+
+AND RUN CHROME WITH "C:\Program Files\Google\Chrome\Application\chrome.exe" --new-window --ignore-certificate-errors --disable-web-security --allow-insecure-localhost --user-data-dir="C:\chrome-hsts-bypass" about:blank
+
+NOW TRY VISIT https://fluxer.dev:48763/login
+
+IF YOU SEEING A SSL ERROR, JUST CLICK CONTINUE, IF HSTS ERROR, PLEASE CHECK YOU RUNNED WITH CHROME FLAGS?
