@@ -163,6 +163,27 @@ pnpm run wasm:codegen
 ls -la ~/fluxer/fluxer_app/pkgs/libfluxcore
 ```
 
+### 5.6 Initial run to generate the config
+
+Run the full environment once so that Fluxer compiles all remaining assets and auto-generates the configuration file `config/config.json`:
+
+```bash
+cd ~/fluxer
+devenv up
+```
+
+> **⏳ Wait for the compilation to complete.** Build logs will scroll in the terminal — this may take several minutes depending on your hardware. Once the output stabilizes and all services have started, the file `config/config.json` will be created automatically.
+>
+> After you confirm the compilation has finished, **press `Ctrl + C`** to stop the process.
+
+Verify the config was created:
+
+```bash
+ls -la config/config.json
+```
+
+You should see the file listed. Now proceed to editing it in the next step.
+
 ---
 
 ## 6. Configure the Domain
@@ -282,10 +303,10 @@ These steps are performed **on your local machine**, not on the server.
 
 Add the following line to your hosts file:
 
-| OS      | File path                                      |
-|---------|-------------------------------------------------|
-| Windows | `C:\Windows\System32\drivers\etc\hosts`         |
-| Linux / macOS | `/etc/hosts`                              |
+| OS            | File path                                       |
+|---------------|-------------------------------------------------|
+| Windows       | `C:\Windows\System32\drivers\etc\hosts`         |
+| Linux / macOS | `/etc/hosts`                                    |
 
 ```
 <YOUR_SERVER_IP>   fluxer.dev
@@ -340,3 +361,4 @@ https://fluxer.dev:48763/login
 | **`configPath` missing** during `devenv shell` | Apply the Nix fix described in step 4. |
 | **Port 48763 not reachable** | Check your firewall rules: `sudo ufw allow 48763/tcp` |
 | **`devenv shell` hangs or fails** | Try `devenv shell -- --show-trace` for a detailed error trace. |
+| **`config/config.json` not found** | Make sure you completed step 5.6 — run `devenv up`, wait for compilation to finish, then press `Ctrl + C`. |
