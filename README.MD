@@ -417,6 +417,6 @@ https://fluxer.dev:48763/login
 
 If everything was done correctly, you should see the Fluxer login screen:
 
-![Fluxer Login Screen](done.png)
+![Fluxer Login Screen](.github/done.png)
 
 Congratulations — enjoy the best self-hosted Discord alternative, running right on your own server!
