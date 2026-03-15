@@ -172,9 +172,35 @@ cd ~/fluxer
 devenv up
 ```
 
-> **⏳ Wait for the compilation to complete.** Build logs will scroll in the terminal — this may take several minutes depending on your hardware. Once the output stabilizes and all services have started, the file `config/config.json` will be created automatically.
->
-> After you confirm the compilation has finished, **press `Ctrl + C`** to stop the process.
+> **⏳ Wait for the compilation to complete.** Build logs will scroll in the terminal — this may take several minutes depending on your hardware.
+
+#### How to know the compilation is done
+
+Watch the terminal output. The compilation is **fully complete** when you see **all three** of these indicators:
+
+1. **`fluxer_app`** — Rspack has finished compiling:
+   ```
+   [fluxer_app     ] Rspack compiled successfully in XX.XX s
+   ```
+
+2. **`fluxer_gateway`** — the Erlang release has been assembled and started:
+   ```
+   [fluxer_gateway ] ===> Release successfully assembled: _build/dev/rel/fluxer_gateway
+   [fluxer_gateway ] Starting gateway release...
+   ```
+
+3. **`fluxer_gateway`** — the SASL application is running and the gateway is receiving NATS pings:
+   ```
+   [fluxer_gateway ] =PROGRESS REPORT====
+   [fluxer_gateway ]     application: sasl
+   [fluxer_gateway ]     started_at: 'fluxer_gateway@127.0.0.1'
+   ...
+   [fluxer_gateway ] got data: <<"PING\r\n">>
+   ```
+
+Once you see the `PING` messages appearing, everything is up and running. The file `config/config.json` has been generated.
+
+**Press `Ctrl + C`** to stop the process.
 
 Verify the config was created:
 
