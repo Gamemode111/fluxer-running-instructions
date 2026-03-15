@@ -78,7 +78,7 @@ nix-env --install --attr devenv -f https://github.com/NixOS/nixpkgs/tarball/nixp
 
 ```bash
 cd ~/fluxer
-devenv shell
+devenv shell -- --show-trace
 ```
 
 ### Known Issue: `configPath` missing
