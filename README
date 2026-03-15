@@ -1,174 +1,342 @@
+# Fluxer — Installation Guide
+
+> Step-by-step instructions for deploying Fluxer on a fresh Linux (Ubuntu/Debian) server with HTTPS support.
+
+---
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Create a System User](#1-create-a-system-user)
+3. [Clone the Repository](#2-clone-the-repository)
+4. [Install Nix & Devenv](#3-install-nix--devenv)
+5. [Enter the Dev Shell](#4-enter-the-dev-shell)
+6. [Build the Project](#5-build-the-project)
+7. [Configure the Domain](#6-configure-the-domain)
+8. [Generate SSL Certificates](#7-generate-ssl-certificates)
+9. [Configure Caddy (HTTPS)](#8-configure-caddy-https)
+10. [Start the Server](#9-start-the-server)
+11. [Client-Side Setup](#10-client-side-setup)
+12. [Troubleshooting](#troubleshooting)
+
+---
+
+## Prerequisites
+
+- A Linux server (Ubuntu/Debian recommended)
+- `sudo` privileges
+- `git`, `curl` installed
+- A public IP address (for remote access)
+
+---
+
+## 1. Create a System User
+
+```bash
 sudo adduser fluxer
 sudo usermod -aG sudo fluxer
 sudo -u fluxer -i
+```
 
+All subsequent commands should be run as the `fluxer` user.
+
+---
+
+## 2. Clone the Repository
+
+```bash
 git clone https://github.com/fluxerapp/fluxer.git
 cd fluxer/
+```
+
+---
+
+## 3. Install Nix & Devenv
+
+Install the Nix package manager (daemon mode):
+
+```bash
 sh <(curl -L https://nixos.org/nix/install) --daemon
+```
+
+**Log out and log back in** for the Nix environment to take effect:
+
+```bash
 exit
+sudo -u fluxer -i
+```
+
+Install Devenv:
+
+```bash
 nix-env --install --attr devenv -f https://github.com/NixOS/nixpkgs/tarball/nixpkgs-unstable
-cd fluxer/
+```
+
+---
+
+## 4. Enter the Dev Shell
+
+```bash
+cd ~/fluxer
 devenv shell
+```
 
-// получаем ошибку и вводим
-devenv shell -- --show-trace
+### Known Issue: `configPath` missing
 
-ПОЛУЧАЕМ:
-fluxer@v62309:~/fluxer$ devenv shell -- --show-trace
-✓ Configuring shell                                                                           13.6s
-  └ ✗ Evaluating shell 3817 files                                                             13.6s
-Error:   × Evaluation error: Failed to get drvPath from shell derivation: warning: ignoring the client-
-  │ specified setting 'system', because it is a restricted setting and you are not a trusted user:
-  │        … while calling the 'derivationStrict' builtin
-  │          at «nix-internal»/derivation-internal.nix:37:12:
-  │            36|
-  │            37|   strict = derivationStrict drvAttrs;
-  │              |            ^
-  │            38|
-  │
-  │
-  │        … while evaluating derivation 'devenv-shell'
-  │          whose name attribute is located at /nix/store/kkx2hzq20ggrwhy385jglnxjncg4lqck-
-  │ source/pkgs/stdenv/generic/make-derivation.nix:536:13
-  │
-  │        … while evaluating attribute 'shellHook' of derivation 'devenv-shell'
-  │          at /nix/store/kkx2hzq20ggrwhy385jglnxjncg4lqck-source/pkgs/build-support/mkshell/
-  │ default.nix:44:7:
-  │            43|
-  │            44|       shellHook = lib.concatStringsSep "\n" (
-  │              |       ^
-  │            45|         lib.catAttrs "shellHook" (lib.reverseList inputsFrom ++ [ attrs ])
-  │
-  │
-  │        … while evaluating the option `enterShell':
-  │
-  │        … while evaluating definitions from `/nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-
-  │ source/src/modules/integrations/git-hooks.nix':
-  │
-  │        (stack trace truncated; use '--show-trace' to show the full, detailed trace)
-  │
-  │
-  │        at /nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-source/src/modules/integrations/git-
-  │ hooks.nix:126:47:
-  │           125|         if [ -z "$configFile" ]; then
-  │           126|           configFile='${config.devenv.root}/${cfg.configPath}'
-  │              |                                               ^
-  │           127|         fi
-  │
-  │        error: attribute 'configPath' missing
+If you see an error like:
 
+```
+error: attribute 'configPath' missing
+```
 
-go to /nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-source/src/modules/integrations/git-hooks.nix
+at `/nix/store/…/src/modules/integrations/git-hooks.nix`, line 126 — apply this fix:
 
-sudo nano /nix/store/w5nb8i03xljf9xl5myr5xlgy199x86kl-source/src/modules/integrations/git-hooks.nix
+```bash
+sudo nano /nix/store/<hash>-source/src/modules/integrations/git-hooks.nix
+```
 
+Change line 126 **from**:
 
-fixing on 126 string from ``configFile='${config.devenv.root}/${cfg.configPath}'`` to ``configFile='${config.devenv.root}/${cfg.configPath or ""}'``
+```nix
+configFile='${config.devenv.root}/${cfg.configPath}'
+```
 
-writing:
+**to**:
+
+```nix
+configFile='${config.devenv.root}/${cfg.configPath or ""}'
+```
+
+Then re-enter the shell:
+
+```bash
 devenv shell
+```
+
+---
+
+## 5. Build the Project
+
+### 5.1 Install dependencies & generate schemas
+
+```bash
 pnpm install
 pnpm run schema:generate
 ls -la packages/config/src/MasterZodSchema.generated*
+```
+
+### 5.2 Build the WASM core
+
+```bash
 cd ~/fluxer/fluxer_app/crates/libfluxcore
 cargo build --release --target wasm32-unknown-unknown
+```
 
-cd ~/fluxer
-cd fluxer_app
+### 5.3 Generate assets
+
+```bash
+cd ~/fluxer/fluxer_app
 pnpm run generate:colors
 pnpm run generate:css-types
+```
 
-doing:
+### 5.4 Extract & compile i18n translations
 
+```bash
 cd ~/fluxer/fluxer_app
 pnpm run i18n:extract
 pnpm run i18n:compile
 ls -la src/locales/*/messages.mjs
+```
 
+### 5.5 Generate masks & WASM codegen
 
-cd ~/fluxer/fluxer_app
-pnpm run generate:colors
-pnpm run generate:css-types
-ls -la src/styles/generated/
-
+```bash
 cd ~/fluxer/fluxer_app
 pnpm run generate:masks
+
 cd ~/fluxer/fluxer_app/crates/libfluxcore
 cargo build --release --target wasm32-unknown-unknown
+
 cd ~/fluxer/fluxer_app
 pnpm run wasm:codegen
 ls -la ~/fluxer/fluxer_app/pkgs/libfluxcore
+```
 
-and see config/config.json and insert:
+---
 
-  FROM:
-  "domain": {
-    "base_domain": "localhost",
-    "public_port": 48763
-  },
-  TO:
-  "domain": {
-    "base_domain": "fluxer.dev",
-    "public_port": 48763,
-    "public_scheme": "https"
-  },
+## 6. Configure the Domain
 
-mkdir certs
-please create a certs/fluxer.conf with:
-``[req]                                                                                                                                                                                   
-default_bits = 4096                                                                                                                                                                     
-prompt = no                                                                                                                                                                             
-default_md = sha256                                                                                                                                                                     
-req_extensions = req_ext                                                                                                                                                                
-distinguished_name = dn                                                                                                                                                                 
-                                                                                                                                                                                        
-[dn]                                                                                                                                                                                    
-CN = fluxer.dev                                                                                                                                                                         
-                                                                                                                                                                                        
-[req_ext]                                                                                                                                                                               
-subjectAltName = @alt_names                                                                                                                                                             
-                                                                                                                                                                                        
-[alt_names]                                                                                                                                                                             
-DNS.1 = fluxer.dev                                                                                                                                                                      
-DNS.2 = localhost                                                                                                                                                                       
-IP.1 = 127.0.0.1                                                                                                                                                                        
-IP.2 = <<PLEASE REPLACE HERE YOUR PUBLIC IP BEFORE YOU SAVE THIS CONFIGURATION!!!>>``
+Edit `config/config.json` and update the `domain` section:
 
+**Before:**
 
+```json
+"domain": {
+  "base_domain": "localhost",
+  "public_port": 48763
+}
+```
+
+**After:**
+
+```json
+"domain": {
+  "base_domain": "fluxer.dev",
+  "public_port": 48763,
+  "public_scheme": "https"
+}
+```
+
+---
+
+## 7. Generate SSL Certificates
+
+### 7.1 Create the OpenSSL config
+
+```bash
+mkdir -p ~/fluxer/certs
+```
+
+Create the file `~/fluxer/certs/fluxer.conf` with the following content:
+
+```ini
+[req]
+default_bits = 4096
+prompt = no
+default_md = sha256
+req_extensions = req_ext
+distinguished_name = dn
+
+[dn]
+CN = fluxer.dev
+
+[req_ext]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = fluxer.dev
+DNS.2 = localhost
+IP.1 = 127.0.0.1
+IP.2 = <YOUR_PUBLIC_IP>
+```
+
+> **Important:** Replace `<YOUR_PUBLIC_IP>` with your server's actual public IP address.
+
+### 7.2 Generate the certificate
+
+```bash
 cd ~/fluxer/certs
-openssl req -x509 -newkey rsa:4096 -keyout fluxer.key -out fluxer.crt -days 365 -nodes -config fluxer.conf
+openssl req -x509 -newkey rsa:4096 \
+  -keyout fluxer.key \
+  -out fluxer.crt \
+  -days 365 -nodes \
+  -config fluxer.conf
+
 ls -la ~/fluxer/certs
+```
 
-AND SEE dev/Caddyfile.dev:
+You should see `fluxer.key`, `fluxer.crt`, and `fluxer.conf`.
 
+---
+
+## 8. Configure Caddy (HTTPS)
+
+Edit `dev/Caddyfile.dev`.
+
+**Before:**
+
+```caddyfile
 :48763 {
-	handle /_caddy_health {
-		respond "OK" 200
-	}
+    handle /_caddy_health {
+        respond "OK" 200
+    }
+```
 
-REPLACE IT WITH
+**After:**
 
+```caddyfile
 fluxer.dev:48763 {
-	tls /home/fluxer/fluxer/certs/fluxer.crt /home/fluxer/fluxer/certs/fluxer.key
-	
-	handle /_caddy_health {
-		respond "OK" 200
-	}
+    tls /home/fluxer/fluxer/certs/fluxer.crt /home/fluxer/fluxer/certs/fluxer.key
 
-please run it:
+    handle /_caddy_health {
+        respond "OK" 200
+    }
+```
+
+---
+
+## 9. Start the Server
+
+```bash
 devenv up
+```
 
-and you need pass here (ON YOUR LOCAL PC, NOT YOUR LINUX SERVER, OR FLUXER INSTANCE!!!):
-C:\Windows\System32\drivers\etc\hosts (WINDOWS)
-OR:
-/etc/hosts (LINUX)
+---
 
-ADD:
+## 10. Client-Side Setup
 
-<INSERT HERE YOUR SERVER IP!>   fluxer.dev
+These steps are performed **on your local machine**, not on the server.
 
-AND RUN CHROME WITH "C:\Program Files\Google\Chrome\Application\chrome.exe" --new-window --ignore-certificate-errors --disable-web-security --allow-insecure-localhost --user-data-dir="C:\chrome-hsts-bypass" about:blank
+### 10.1 Update the hosts file
 
-NOW TRY VISIT https://fluxer.dev:48763/login
+Add the following line to your hosts file:
 
-IF YOU SEEING A SSL ERROR, JUST CLICK CONTINUE, IF HSTS ERROR, PLEASE CHECK YOU RUNNED WITH CHROME FLAGS?
+| OS      | File path                                      |
+|---------|-------------------------------------------------|
+| Windows | `C:\Windows\System32\drivers\etc\hosts`         |
+| Linux / macOS | `/etc/hosts`                              |
+
+```
+<YOUR_SERVER_IP>   fluxer.dev
+```
+
+> Replace `<YOUR_SERVER_IP>` with the public IP of your server.
+
+### 10.2 Launch Chrome (bypassing self-signed certificate warnings)
+
+Since we use a self-signed certificate, Chrome needs special flags:
+
+**Windows:**
+
+```cmd
+"C:\Program Files\Google\Chrome\Application\chrome.exe" ^
+  --new-window ^
+  --ignore-certificate-errors ^
+  --disable-web-security ^
+  --allow-insecure-localhost ^
+  --user-data-dir="C:\chrome-hsts-bypass" ^
+  about:blank
+```
+
+**Linux:**
+
+```bash
+google-chrome \
+  --new-window \
+  --ignore-certificate-errors \
+  --disable-web-security \
+  --allow-insecure-localhost \
+  --user-data-dir="/tmp/chrome-hsts-bypass" \
+  about:blank
+```
+
+### 10.3 Open Fluxer
+
+Navigate to:
+
+```
+https://fluxer.dev:48763/login
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| **SSL certificate error** | Click "Advanced" → "Proceed" in the browser warning page. |
+| **HSTS error in Chrome** | Make sure you launched Chrome with the flags from step 10.2. Use a fresh `--user-data-dir` to avoid cached HSTS policies. |
+| **`configPath` missing** during `devenv shell` | Apply the Nix fix described in step 4. |
+| **Port 48763 not reachable** | Check your firewall rules: `sudo ufw allow 48763/tcp` |
+| **`devenv shell` hangs or fails** | Try `devenv shell -- --show-trace` for a detailed error trace. |
