@@ -217,6 +217,25 @@ You should see the file listed. Now proceed to editing it in the next step.
 
 ## 6. Configure the Domain
 
+### Why HTTPS and a custom domain instead of `localhost`?
+
+Fluxer integrates with external services (such as Bluesky) via OIDC discovery at the `/.well-known/fluxer` endpoint. These integrations enforce strict URL requirements:
+
+- `client_id` **must** use the `https:` protocol — plain `http` is rejected outright.
+- `redirect_uris`, `jwks_uri`, and `client_uri` must either point to `localhost` / `127.0.0.1` / `[::1]`, **or** use `https` with a real domain name.
+
+If you try to run Fluxer on plain `http://localhost`, the OIDC metadata generation fails and requests to `/.well-known/fluxer` return:
+
+```json
+{"code":"INTERNAL_SERVER_ERROR","message":"Internal server error."}
+```
+
+This is why we set up a custom domain (`fluxer.dev`) with a self-signed SSL certificate — it's the simplest way to satisfy these requirements **without owning a real domain or configuring DNS**. You just add one line to your local `hosts` file and you're done.
+
+> **If you own a domain**, you can of course use it instead of `fluxer.dev` and set up a proper certificate (e.g. via Let's Encrypt). Replace `fluxer.dev` with your domain throughout this guide.
+
+---
+
 Edit `config/config.json` and update the `domain` section:
 
 **Before:**
@@ -398,6 +417,6 @@ https://fluxer.dev:48763/login
 
 If everything was done correctly, you should see the Fluxer login screen:
 
-![Fluxer Login Screen](.github/done.png)
+![Fluxer Login Screen](done.png)
 
 Congratulations — enjoy the best self-hosted Discord alternative, running right on your own server!
